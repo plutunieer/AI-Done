@@ -24,7 +24,7 @@ export default function RegisterPage() {
     const data = await res.json();
     setLoading(false);
     if (!res.ok) { setError(data.error); return; }
-    router.push("/");
+    router.push("/onboarding");
     router.refresh();
   }
 

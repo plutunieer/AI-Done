@@ -84,24 +84,28 @@ function CompleteModal({ task, onClose, onDone }: {
       body: JSON.stringify({ sessionNotes: notes, nextBriefing: briefing || undefined }),
     });
 
-    // Buddy informieren — er erstellt Follow-ups falls nötig
-    setBuddyStatus("Buddy analysiert…");
-    const prompt = `Task "${task.title}" wurde abgeschlossen.\n\nWas gemacht wurde: ${notes}${briefing ? `\n\nFür den nächsten Termin: ${briefing}` : ""}\n\nBitte prüfe ob ein Follow-up Termin nötig ist und erstelle ihn direkt im Kalender falls ja. Antworte kurz.`;
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: prompt }),
-      });
-      const data = await res.json();
-      setBuddyStatus(data.reply ?? null);
-    } catch {
-      setBuddyStatus(null);
-    }
-
     setSaving(false);
-    // Kurz Buddy-Antwort zeigen, dann schliessen
-    setTimeout(() => onDone(), 3000);
+
+    if (briefing.trim()) {
+      // Only create follow-up when user explicitly specified what to do next
+      setBuddyStatus("Buddy plant Follow-up…");
+      const prompt = `Task "${task.title}" abgeschlossen.\n\nWas gemacht: ${notes}\n\nFür den nächsten Termin: ${briefing}\n\nBitte erstelle direkt einen Follow-up Termin im Kalender. Antworte kurz.`;
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: prompt }),
+        });
+        const data = await res.json();
+        setBuddyStatus(data.reply ?? null);
+        window.dispatchEvent(new CustomEvent("buddy-refresh"));
+      } catch {
+        setBuddyStatus(null);
+      }
+      setTimeout(() => onDone(), 3000);
+    } else {
+      onDone();
+    }
   }
 
   return (
@@ -146,7 +150,7 @@ function CompleteModal({ task, onClose, onDone }: {
               disabled={!notes.trim() || saving}
               className="flex-1 px-4 py-2 text-sm bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-40 transition-colors"
             >
-              {saving ? "Buddy fragen…" : "Abschliessen"}
+              {saving ? "Speichern…" : "Abschliessen"}
             </button>
           </div>
         )}
@@ -234,6 +238,16 @@ export default function Dashboard() {
     });
     setOverdueTasks((prev) => prev.filter((t) => t.id !== task.id));
     setTodayTasks((prev) => prev.filter((t) => t.id !== task.id));
+  }
+
+  async function endOfDay() {
+    const prompt = "Tagesabschluss: Schau dir meine heutigen Tasks an. Frage mich was ich erledigt habe und was noch offen ist. Dann hilf mir entscheiden ob offene Tasks verschoben, gelöscht oder für morgen eingeplant werden sollen.";
+    await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: prompt }),
+    });
+    window.dispatchEvent(new CustomEvent("buddy-refresh"));
   }
 
   const now = new Date();
@@ -418,6 +432,19 @@ export default function Dashboard() {
                 })}
               </div>
             )}
+          </div>
+          {/* Tagesabschluss */}
+          <div className="col-span-3 border border-gray-200 rounded-2xl p-5 bg-white flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-gray-900 text-sm">Tag abschliessen</p>
+              <p className="text-xs text-gray-400 mt-0.5">Buddy fragt dich was noch offen ist und plant es ein</p>
+            </div>
+            <button
+              onClick={endOfDay}
+              className="px-4 py-2 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-700 transition-colors shrink-0 ml-4"
+            >
+              Tagesabschluss →
+            </button>
           </div>
         </div>
       </div>

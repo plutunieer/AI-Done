@@ -44,7 +44,7 @@ export default function Chat() {
     rec.start();
   }
 
-  useEffect(() => {
+  function loadMessages() {
     fetch("/api/chat")
       .then((r) => r.json())
       .then((d) => {
@@ -52,6 +52,12 @@ export default function Chat() {
           setMessages(d.messages);
         }
       });
+  }
+
+  useEffect(() => {
+    loadMessages();
+    window.addEventListener("buddy-refresh", loadMessages);
+    return () => window.removeEventListener("buddy-refresh", loadMessages);
   }, []);
 
   useEffect(() => {

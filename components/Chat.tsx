@@ -56,10 +56,9 @@ export default function Chat() {
         body: JSON.stringify({ message: text }),
       });
       const data = await res.json();
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: data.reply ?? data.error ?? "Fehler" },
-      ]);
+      const content = data.reply
+        ?? (data.error === "overloaded" ? "Buddy ist gerade überlastet — bitte in ein paar Sekunden nochmal versuchen." : data.error ?? "Fehler");
+      setMessages((prev) => [...prev, { role: "assistant", content }]);
     } catch {
       setMessages((prev) => [
         ...prev,

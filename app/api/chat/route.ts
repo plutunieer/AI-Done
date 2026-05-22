@@ -32,7 +32,11 @@ export async function POST(req: NextRequest) {
     const reply = await chat(history, userId);
     await sql`INSERT INTO conversations (role, content, user_id) VALUES ('assistant', ${reply}, ${userId})`;
     return NextResponse.json({ reply });
-  } catch (err) {
+  } catch (err: unknown) {
+    const isOverloaded = err instanceof Error && err.message.toLowerCase().includes("overloaded");
+    if (isOverloaded) {
+      return NextResponse.json({ error: "overloaded" }, { status: 503 });
+    }
     const msg = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: msg }, { status: 500 });
   }

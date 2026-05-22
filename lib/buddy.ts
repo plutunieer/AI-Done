@@ -210,6 +210,19 @@ async function runTool(
   }
 }
 
+async function callApi(params: Anthropic.Messages.MessageCreateParamsNonStreaming, attempt = 1): Promise<Anthropic.Messages.Message> {
+  try {
+    return await client.messages.create(params);
+  } catch (err: unknown) {
+    const isOverloaded = err instanceof Anthropic.APIError && err.status === 529;
+    if (isOverloaded && attempt < 4) {
+      await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
+      return callApi(params, attempt + 1);
+    }
+    throw err;
+  }
+}
+
 export async function chat(history: Message[], userId: number): Promise<string> {
   const messages: Anthropic.Messages.MessageParam[] = history.map((m) => ({
     role: m.role,
@@ -217,14 +230,9 @@ export async function chat(history: Message[], userId: number): Promise<string> 
   }));
 
   const systemPrompt = await getSystemPrompt(userId);
+  const baseParams = { model: "claude-sonnet-4-6", max_tokens: 2048, system: systemPrompt, tools } as const;
 
-  let response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 2048,
-    system: systemPrompt,
-    tools,
-    messages,
-  });
+  let response = await callApi({ ...baseParams, messages });
 
   while (response.stop_reason === "tool_use") {
     const assistantMessage: Anthropic.Messages.MessageParam = {
@@ -252,13 +260,7 @@ export async function chat(history: Message[], userId: number): Promise<string> 
     messages.push(assistantMessage);
     messages.push({ role: "user", content: toolResults });
 
-    response = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 2048,
-      system: systemPrompt,
-      tools,
-      messages,
-    });
+    response = await callApi({ ...baseParams, messages });
   }
 
   const textBlock = response.content.find((b) => b.type === "text");

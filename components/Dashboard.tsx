@@ -240,6 +240,17 @@ export default function Dashboard() {
     setTodayTasks((prev) => prev.filter((t) => t.id !== task.id));
   }
 
+  async function quickComplete(task: Task) {
+    if (!task.id) return;
+    await fetch(`/api/tasks/${task.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "done" }),
+    });
+    setOverdueTasks((prev) => prev.filter((t) => t.id !== task.id));
+    setTodayTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, status: "done" } : t));
+  }
+
   async function endOfDay() {
     const prompt = "Tagesabschluss: Schau dir meine heutigen Tasks an. Frage mich was ich erledigt habe und was noch offen ist. Dann hilf mir entscheiden ob offene Tasks verschoben, gelöscht oder für morgen eingeplant werden sollen.";
     await fetch("/api/chat", {
@@ -317,10 +328,6 @@ export default function Dashboard() {
               <div className="space-y-3">
                 {overdueTasks.map((task) => (
                   <div key={task.id} className="flex items-start gap-3">
-                    <button
-                      onClick={() => setCompleting(task)}
-                      className="w-5 h-5 rounded-full border-2 border-orange-300 hover:border-green-400 shrink-0 mt-0.5 transition-colors"
-                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">{task.title}</p>
                       <p className="text-xs text-orange-400">
@@ -335,12 +342,20 @@ export default function Dashboard() {
                         </p>
                       )}
                     </div>
-                    <button
-                      onClick={() => skipTask(task)}
-                      className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded hover:bg-gray-100 transition-colors shrink-0"
-                    >
-                      Überspringen
-                    </button>
+                    <div className="flex gap-1 shrink-0">
+                      <button
+                        onClick={() => quickComplete(task)}
+                        className="text-xs text-green-600 font-medium hover:text-green-700 px-2 py-1 rounded hover:bg-green-50 transition-colors"
+                      >
+                        Erledigt
+                      </button>
+                      <button
+                        onClick={() => skipTask(task)}
+                        className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+                      >
+                        Überspringen
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
